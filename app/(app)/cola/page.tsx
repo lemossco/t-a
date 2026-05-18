@@ -105,7 +105,7 @@ export default async function ColaPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {cola.map((item) => (
+              {cola.map((item: any) => (
                 <TableRow key={item.id} className="hover:bg-muted/40">
                   <TableCell className="text-muted-foreground text-xs">
                     {item.posicion}
