@@ -1,0 +1,804 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model agentes {
+  id                                        String                @id
+  usuario_id                                String                @unique
+  tipo                                      TipoAgente
+  clave                                     String                @unique
+  activo                                    Boolean               @default(true)
+  created_at                                DateTime              @default(now())
+  usuarios                                  usuarios              @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+  asignaciones_cuenta                       asignaciones_cuenta[]
+  cola_trabajo                              cola_trabajo[]
+  gestiones_gestiones_agente_idToagentes    gestiones[]           @relation("gestiones_agente_idToagentes")
+  gestiones_gestiones_visitador_idToagentes gestiones[]           @relation("gestiones_visitador_idToagentes")
+
+  @@index([tipo])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model asignaciones_cuenta {
+  id               String   @id
+  cuenta_id        String   @unique
+  agente_id        String
+  asignado_por     String?
+  fecha_asignacion DateTime @default(now())
+  activa           Boolean  @default(true)
+  agentes          agentes  @relation(fields: [agente_id], references: [id])
+  cuentas          cuentas  @relation(fields: [cuenta_id], references: [id])
+
+  @@index([agente_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model audit_logs {
+  id            String    @id
+  timestamp     DateTime  @default(now())
+  usuario_id    String?
+  usuario_email String?
+  accion        String
+  recurso_tipo  String
+  recurso_id    String?
+  tenant_id     String?
+  ip_address    String?
+  user_agent    String?
+  old_values    Bytes?
+  new_values    Bytes?
+  exitoso       Boolean   @default(true)
+  error_mensaje String?
+  usuarios      usuarios? @relation(fields: [usuario_id], references: [id])
+
+  @@index([recurso_tipo, recurso_id])
+  @@index([tenant_id])
+  @@index([timestamp])
+  @@index([usuario_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bitacora_juicio {
+  id              String       @id
+  datos_juicio_id String
+  tipo            String?
+  abogado         String?
+  etapa           String?
+  fecha_etapa     DateTime?
+  subtapa         String?
+  fecha_subtapa   DateTime?
+  comentario      String?
+  fecha_captura   DateTime     @default(now())
+  tipo_juicio     String?
+  estado          String?
+  datos_juicio    datos_juicio @relation(fields: [datos_juicio_id], references: [id], onDelete: Cascade)
+
+  @@index([datos_juicio_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model catalogos {
+  id          String   @id
+  tipo        String
+  codigo      String
+  descripcion String
+  activo      Boolean  @default(true)
+  orden       Int      @default(0)
+  metadata    Json?
+  created_at  DateTime @default(now())
+
+  @@unique([tipo, codigo])
+  @@index([tipo])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model clientes {
+  id                           String                         @id
+  nombre                       String
+  nombre_corto                 String                         @unique
+  rfc                          String?
+  contacto_nombre              String?
+  contacto_email               String?
+  contacto_tel                 String?
+  activo                       Boolean                        @default(true)
+  created_at                   DateTime                       @default(now())
+  cola_trabajo                 cola_trabajo[]
+  configuracion_automatizacion configuracion_automatizacion[]
+  configuracion_scoring        configuracion_scoring?
+  cuentas                      cuentas[]
+  datos_externos_scoring       datos_externos_scoring[]
+  lotes_importacion            lotes_importacion[]
+  mapeo_columnas               mapeo_columnas[]
+  scores_cuenta                scores_cuenta[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model cola_trabajo {
+  id            String                 @id
+  agente_id     String
+  cliente_id    String
+  cuenta_id     String
+  fecha_cola    DateTime               @db.Date
+  posicion      Int
+  score         Decimal?               @db.Decimal(5, 2)
+  bucket        BucketRecuperabilidad?
+  motivo        String?
+  gestionada    Boolean                @default(false)
+  gestionada_at DateTime?
+  created_at    DateTime               @default(now())
+  agentes       agentes                @relation(fields: [agente_id], references: [id])
+  clientes      clientes               @relation(fields: [cliente_id], references: [id])
+  cuentas       cuentas                @relation(fields: [cuenta_id], references: [id])
+
+  @@unique([agente_id, cuenta_id, fecha_cola])
+  @@index([agente_id, fecha_cola])
+  @@index([cliente_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model configuracion_automatizacion {
+  id                         String                       @id
+  cliente_id                 String
+  activa                     Boolean                      @default(true)
+  nombre                     String
+  descripcion                String?
+  condicion_tipo             TipoCondicion
+  condicion_valor            Json
+  accion_tipo                TipoAccion
+  accion_config              Json
+  cooldown_dias              Int                          @default(1)
+  orden                      Int                          @default(0)
+  created_at                 DateTime                     @default(now())
+  updated_at                 DateTime
+  clientes                   clientes                     @relation(fields: [cliente_id], references: [id])
+  ejecuciones_automatizacion ejecuciones_automatizacion[]
+
+  @@index([cliente_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model configuracion_folio {
+  id          String  @id
+  prefijo     String?
+  sufijo      String?
+  longitud    Int     @default(8)
+  consecutivo Int     @default(1)
+  activo      Boolean @default(true)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model configuracion_scoring {
+  id                         String              @id
+  cliente_id                 String              @unique
+  activo                     Boolean             @default(true)
+  motor_activo               MotorScoring        @default(REGLAS)
+  umbral_activacion_ml       Int                 @default(500)
+  frecuencia_reentrenamiento Int                 @default(7)
+  ultimo_entrenamiento       DateTime?
+  precision_modelo           Decimal?            @db.Decimal(5, 4)
+  cuentas_entrenamiento      Int?
+  created_at                 DateTime            @default(now())
+  updated_at                 DateTime
+  clientes                   clientes            @relation(fields: [cliente_id], references: [id])
+  historial_modelos          historial_modelos[]
+  variables_scoring          variables_scoring[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model cuentas {
+  id                         String                       @id
+  folio                      String                       @unique
+  cliente_id                 String
+  numero_credito             String?
+  contrato                   String?
+  cartera                    String?
+  producto                   String?
+  condicion                  String?
+  referencia_bancaria        String?
+  nombre_cliente             Bytes?
+  fecha_nacimiento           DateTime?
+  correo_electronico         Bytes?
+  datos_trabajo              String?
+  numero_trabajo             String?
+  de_cliente                 String?
+  calle_numero               String?
+  colonia                    String?
+  municipio_delegacion       String?
+  estado                     String?
+  codigo_postal              String?
+  fecha_inicio_credito       DateTime?
+  fecha_final_credito        DateTime?
+  dias_atraso                Int                          @default(0)
+  meses_vencidos             Int                          @default(0)
+  mensualidades_pagadas      Int                          @default(0)
+  saldo_vencido              Decimal                      @default(0) @db.Decimal(18, 2)
+  saldo_total                Decimal                      @default(0) @db.Decimal(18, 2)
+  saldo_total_por_vencer     Decimal                      @default(0) @db.Decimal(18, 2)
+  gastos_cobranza            Decimal                      @default(0) @db.Decimal(18, 2)
+  saldo_total_con_gastos     Decimal                      @default(0) @db.Decimal(18, 2)
+  descuento                  Decimal                      @default(0) @db.Decimal(18, 2)
+  total_pagado               Decimal                      @default(0) @db.Decimal(18, 2)
+  plazo_financiamiento       String?
+  tipo_seguro                String?
+  mes_vencido                String?
+  fecha_ultimo_pago          DateTime?
+  fecha_asignacion           DateTime?
+  dacion_de_pago             Boolean?
+  fecha_dacion               DateTime?
+  detalle_garantia           String?
+  referencia                 String?
+  marca                      String?
+  tipo_unidad                String?
+  anio                       Int?
+  serie_vin                  String?
+  nombre_aval                String?
+  calle_aval                 String?
+  colonia_aval               String?
+  estado_aval                String?
+  municipio_aval             String?
+  cp_aval                    String?
+  nombre_referencia          String?
+  nombre_referencia2         String?
+  num_cuenta_domiciliacion   String?
+  numero_clabe               String?
+  banco_domiciliacion        String?
+  estatus_credito            String?
+  estatus_telefonico         String?
+  estatus_judicial           String?
+  estatus_domiciliario       String?
+  estatus_rpp                String?
+  ultima_gestion             String?
+  fecha_ultima_gestion       DateTime?
+  gestor_trabajo             String?
+  gestion_relevante          String?
+  fecha_relevante            DateTime?
+  gestor_asignado            String?
+  pateos                     Int                          @default(0)
+  lote_importacion_id        String?
+  created_at                 DateTime                     @default(now())
+  updated_at                 DateTime
+  asignaciones_cuenta        asignaciones_cuenta?
+  cola_trabajo               cola_trabajo[]
+  clientes                   clientes                     @relation(fields: [cliente_id], references: [id])
+  lotes_importacion          lotes_importacion?           @relation(fields: [lote_importacion_id], references: [id])
+  datos_externos_scoring     datos_externos_scoring?
+  datos_juicio               datos_juicio?
+  domicilios                 domicilios[]
+  ejecuciones_automatizacion ejecuciones_automatizacion[]
+  gestiones                  gestiones[]
+  pagos                      pagos[]
+  promesas                   promesas[]
+  scores_cuenta              scores_cuenta[]
+  telefonos                  telefonos[]
+
+  @@index([cliente_id])
+  @@index([dias_atraso])
+  @@index([estatus_judicial])
+  @@index([estatus_telefonico])
+  @@index([fecha_ultima_gestion])
+  @@index([lote_importacion_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model datos_externos_scoring {
+  id                      String             @id
+  cuenta_id               String             @unique
+  cliente_id              String
+  score_buro              Int?
+  nivel_riesgo_banco      String?
+  meses_cliente_banco     Int?
+  productos_banco         Int?
+  historico_pagos_pct     Decimal?           @db.Decimal(5, 4)
+  ingreso_estimado        Decimal?           @db.Decimal(18, 2)
+  tipo_empleo             String?
+  antiguedad_empleo_meses Int?
+  num_cuentas_morosas     Int?
+  monto_total_deuda       Decimal?           @db.Decimal(18, 2)
+  tiene_garantia          Boolean?
+  valor_garantia          Decimal?           @db.Decimal(18, 2)
+  intentos_contacto_banco Int?
+  ultimo_pago_banco       DateTime?
+  lote_importacion_id     String?
+  created_at              DateTime           @default(now())
+  updated_at              DateTime
+  clientes                clientes           @relation(fields: [cliente_id], references: [id])
+  cuentas                 cuentas            @relation(fields: [cuenta_id], references: [id])
+  lotes_importacion       lotes_importacion? @relation(fields: [lote_importacion_id], references: [id])
+
+  @@index([cliente_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model datos_juicio {
+  id                           String            @id
+  cuenta_id                    String            @unique
+  pagare                       String?
+  fecha_pagare_actual          DateTime?
+  fecha_pagare_inicial         DateTime?
+  fecha_entrega_pagare_actual  DateTime?
+  fecha_entrega_pagare_inicial DateTime?
+  localidad                    String?
+  municipio                    String?
+  tipo_juzgado                 String?
+  numero_juzgado               String?
+  folio_expediente             String?
+  tipo_juicio                  String?
+  fecha_presentacion_demanda   DateTime?
+  fecha_auto_admisorio         DateTime?
+  fecha_emplazamiento          DateTime?
+  fecha_sentencia              DateTime?
+  resultado_sentencia          String?
+  cantidad_liquida_condena     Decimal?          @db.Decimal(18, 2)
+  tasa_interes_condena         Decimal?          @db.Decimal(10, 4)
+  etapa_judicial               String?
+  subtapa_judicial             String?
+  fecha_subtapa                DateTime?
+  providencias                 Boolean           @default(false)
+  tipo_providencia             String?
+  monto_congelar               Decimal?          @db.Decimal(18, 2)
+  pide_garantia                Boolean           @default(false)
+  autoriza_jtc                 Boolean           @default(false)
+  monto_garantizar             Decimal?          @db.Decimal(18, 2)
+  fecha_exhibicion_garantia    DateTime?
+  oficio_girado                String?
+  fecha_gira_oficio            DateTime?
+  respuesta_cnbv               String?
+  fecha_respuesta_cnbv         DateTime?
+  monto_total_retenido         Decimal?          @db.Decimal(18, 2)
+  respuesta_completa           Boolean           @default(false)
+  bide_recuperado              Boolean           @default(false)
+  bide_depositado_tfsm         Boolean           @default(false)
+  comentario_providencia       String?
+  created_at                   DateTime          @default(now())
+  updated_at                   DateTime
+  bitacora_juicio              bitacora_juicio[]
+  cuentas                      cuentas           @relation(fields: [cuenta_id], references: [id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model domicilios {
+  id                   String   @id
+  cuenta_id            String
+  tipo                 String   @default("PRINCIPAL")
+  calle_numero         String?
+  colonia              String?
+  municipio            String?
+  estado               String?
+  codigo_postal        String?
+  entre_calles         String?
+  punto_referencia     String?
+  nivel_socioeconomico String?
+  tipo_vivienda        String?
+  caracteristicas      String?
+  num_niveles          Int?
+  color_fachada        String?
+  color_puerta         String?
+  dictamen             String?
+  created_at           DateTime @default(now())
+  updated_at           DateTime
+  cuentas              cuentas  @relation(fields: [cuenta_id], references: [id], onDelete: Cascade)
+
+  @@index([cuenta_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ejecuciones_automatizacion {
+  id                           String                       @id
+  automatizacion_id            String
+  cuenta_id                    String
+  condicion_evaluada           Json?
+  accion_ejecutada             Json?
+  exitosa                      Boolean                      @default(true)
+  error_mensaje                String?
+  ejecutada_at                 DateTime                     @default(now())
+  configuracion_automatizacion configuracion_automatizacion @relation(fields: [automatizacion_id], references: [id])
+  cuentas                      cuentas                      @relation(fields: [cuenta_id], references: [id])
+
+  @@index([automatizacion_id])
+  @@index([cuenta_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model etapas_judiciales {
+  id                      String                @id
+  codigo                  String                @unique
+  nombre                  String
+  descripcion             String?
+  orden                   Int
+  activo                  Boolean               @default(true)
+  transiciones_permitidas String[]
+  dias_alerta             Int                   @default(0)
+  subtapas_judiciales     subtapas_judiciales[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model gestiones {
+  id                                      String         @id
+  cuenta_id                               String
+  agente_id                               String?
+  usuario_id                              String?
+  tipo                                    TipoGestion
+  resultado                               String?
+  comentario                              String?
+  telefono_usado                          Bytes?
+  tipo_llamada                            String?
+  ponderacion                             Int            @default(0)
+  fecha_gestion                           DateTime
+  visitador_id                            String?
+  tipo_contacto                           String?
+  fuente                                  String?
+  dictamen_domicilio                      String?
+  dias_localizacion                       Int?
+  hora_localizacion_inicio                String?
+  hora_localizacion_fin                   String?
+  latitud                                 Decimal?       @db.Decimal(10, 7)
+  longitud                                Decimal?       @db.Decimal(10, 7)
+  captura                                 DateTime       @default(now())
+  capturista                              String?
+  lote_masivo_id                          String?
+  created_at                              DateTime       @default(now())
+  agentes_gestiones_agente_idToagentes    agentes?       @relation("gestiones_agente_idToagentes", fields: [agente_id], references: [id])
+  cuentas                                 cuentas        @relation(fields: [cuenta_id], references: [id])
+  lotes_masivos                           lotes_masivos? @relation(fields: [lote_masivo_id], references: [id])
+  usuarios                                usuarios?      @relation(fields: [usuario_id], references: [id])
+  agentes_gestiones_visitador_idToagentes agentes?       @relation("gestiones_visitador_idToagentes", fields: [visitador_id], references: [id])
+
+  @@index([agente_id])
+  @@index([cuenta_id])
+  @@index([fecha_gestion])
+  @@index([lote_masivo_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model historial_modelos {
+  id                    String                @id
+  configuracion_id      String
+  version               String
+  tipo_modelo           String?
+  cuentas_entrenamiento Int
+  cuentas_validacion    Int?
+  precision             Decimal               @db.Decimal(5, 4)
+  recall                Decimal?              @db.Decimal(5, 4)
+  f1_score              Decimal?              @db.Decimal(5, 4)
+  variables_usadas      Json?
+  ruta_modelo           String?
+  entrenado_por         String?
+  entrenado_at          DateTime              @default(now())
+  activo                Boolean               @default(false)
+  configuracion_scoring configuracion_scoring @relation(fields: [configuracion_id], references: [id])
+
+  @@index([configuracion_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model lotes_importacion {
+  id                     String                   @id
+  cliente_id             String
+  nombre_archivo         String
+  hash_archivo           String
+  usuario_id             String?
+  ip_address             String?
+  total_filas            Int                      @default(0)
+  filas_exitosas         Int                      @default(0)
+  filas_error            Int                      @default(0)
+  estatus                EstatusLote              @default(PROCESANDO)
+  errores                Json?
+  created_at             DateTime                 @default(now())
+  completado_at          DateTime?
+  cuentas                cuentas[]
+  datos_externos_scoring datos_externos_scoring[]
+  clientes               clientes                 @relation(fields: [cliente_id], references: [id])
+  usuarios               usuarios?                @relation(fields: [usuario_id], references: [id])
+
+  @@index([cliente_id])
+  @@index([estatus])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model lotes_masivos {
+  id             String         @id
+  tipo           TipoLoteMasivo
+  nombre_archivo String
+  usuario_id     String?
+  ip_address     String?
+  total_filas    Int            @default(0)
+  filas_exitosas Int            @default(0)
+  filas_error    Int            @default(0)
+  estatus        EstatusLote    @default(PROCESANDO)
+  errores        Json?
+  created_at     DateTime       @default(now())
+  completado_at  DateTime?
+  gestiones      gestiones[]
+  usuarios       usuarios?      @relation(fields: [usuario_id], references: [id])
+
+  @@index([estatus])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mapeo_columnas {
+  id             String   @id
+  cliente_id     String
+  columna_excel  String
+  campo_sistema  String
+  obligatorio    Boolean  @default(false)
+  transformacion String?
+  activo         Boolean  @default(true)
+  clientes       clientes @relation(fields: [cliente_id], references: [id])
+
+  @@unique([cliente_id, columna_excel])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model pagos {
+  id                String      @id
+  cuenta_id         String
+  usuario_id        String?
+  fecha_pago        DateTime
+  monto             Decimal     @db.Decimal(18, 2)
+  canal_pago        String?
+  referencia        String?
+  tipo_confirmacion String?
+  estatus           EstatusPago @default(PENDIENTE)
+  fecha_validacion  DateTime?
+  validado_por      String?
+  created_at        DateTime    @default(now())
+  updated_at        DateTime
+  cuentas           cuentas     @relation(fields: [cuenta_id], references: [id])
+  usuarios          usuarios?   @relation(fields: [usuario_id], references: [id])
+
+  @@index([cuenta_id])
+  @@index([estatus])
+  @@index([fecha_pago])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model promesas {
+  id                 String         @id
+  cuenta_id          String
+  usuario_id         String?
+  fecha_compromiso   DateTime
+  monto_prometido    Decimal        @db.Decimal(18, 2)
+  numero_pagos       Int            @default(1)
+  comentario         String?
+  estatus            EstatusPromesa @default(PENDIENTE)
+  fecha_cumplimiento DateTime?
+  monto_cumplido     Decimal?       @db.Decimal(18, 2)
+  created_at         DateTime       @default(now())
+  updated_at         DateTime
+  cuentas            cuentas        @relation(fields: [cuenta_id], references: [id])
+  usuarios           usuarios?      @relation(fields: [usuario_id], references: [id])
+
+  @@index([cuenta_id])
+  @@index([estatus])
+  @@index([fecha_compromiso])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model roles {
+  id            String          @id
+  nombre        String          @unique
+  descripcion   String?
+  permisos      Json
+  usuario_roles usuario_roles[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model scores_cuenta {
+  id                   String                @id
+  cuenta_id            String
+  cliente_id           String
+  score                Decimal               @db.Decimal(5, 2)
+  bucket               BucketRecuperabilidad
+  desglose             Json?
+  motor_usado          MotorScoring
+  version_modelo       String?
+  confianza_modelo     Decimal?              @db.Decimal(5, 4)
+  recomendacion        String?
+  canal_recomendado    String?
+  hora_optima_contacto String?
+  calculado_at         DateTime              @default(now())
+  vigente_hasta        DateTime?
+  clientes             clientes              @relation(fields: [cliente_id], references: [id])
+  cuentas              cuentas               @relation(fields: [cuenta_id], references: [id])
+
+  @@index([calculado_at])
+  @@index([cliente_id, bucket])
+  @@index([cuenta_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model sesiones {
+  id         String   @id
+  usuario_id String
+  token_hash String   @unique
+  ip_address String?
+  user_agent String?
+  created_at DateTime @default(now())
+  expires_at DateTime
+  invalidada Boolean  @default(false)
+  usuarios   usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@index([expires_at])
+  @@index([usuario_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model subtapas_judiciales {
+  id                String            @id
+  etapa_id          String
+  codigo            String
+  nombre            String
+  activo            Boolean           @default(true)
+  etapas_judiciales etapas_judiciales @relation(fields: [etapa_id], references: [id], onDelete: Cascade)
+
+  @@unique([etapa_id, codigo])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model telefonos {
+  id           String   @id
+  cuenta_id    String
+  nombre       String?
+  telefono     Bytes
+  tipo         String?
+  fuente       String?
+  parentesco   String?
+  valido       Boolean  @default(true)
+  origen       String   @default("IMPORTACION")
+  calificacion Int      @default(0)
+  created_at   DateTime @default(now())
+  updated_at   DateTime
+  created_by   String?
+  cuentas      cuentas  @relation(fields: [cuenta_id], references: [id], onDelete: Cascade)
+
+  @@index([cuenta_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model usuario_roles {
+  usuario_id  String
+  rol_id      String
+  assigned_at DateTime @default(now())
+  assigned_by String?
+  roles       roles    @relation(fields: [rol_id], references: [id], onDelete: Cascade)
+  usuarios    usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@id([usuario_id, rol_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model usuarios {
+  id                    String              @id
+  nombre                String
+  apellidos             String
+  email                 String              @unique
+  password              String
+  activo                Boolean             @default(true)
+  bloqueado             Boolean             @default(false)
+  intentos_fallidos     Int                 @default(0)
+  ultimo_acceso         DateTime?
+  ultimo_ip             String?
+  debe_cambiar_password Boolean             @default(false)
+  created_at            DateTime            @default(now())
+  updated_at            DateTime
+  agentes               agentes?
+  audit_logs            audit_logs[]
+  gestiones             gestiones[]
+  lotes_importacion     lotes_importacion[]
+  lotes_masivos         lotes_masivos[]
+  pagos                 pagos[]
+  promesas              promesas[]
+  sesiones              sesiones[]
+  usuario_roles         usuario_roles[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model variables_scoring {
+  id                    String                @id
+  configuracion_id      String
+  codigo                String
+  nombre_display        String
+  descripcion_simple    String?
+  peso                  Int                   @default(1)
+  activa                Boolean               @default(true)
+  fuente                FuenteVariable        @default(INTERNO)
+  campo_origen          String?
+  direccion_impacto     DireccionImpacto      @default(POSITIVO)
+  tipo_normalizacion    TipoNormalizacion     @default(LINEAL)
+  valor_minimo          Decimal?              @db.Decimal(18, 4)
+  valor_maximo          Decimal?              @db.Decimal(18, 4)
+  orden                 Int                   @default(0)
+  created_at            DateTime              @default(now())
+  updated_at            DateTime
+  configuracion_scoring configuracion_scoring @relation(fields: [configuracion_id], references: [id], onDelete: Cascade)
+
+  @@unique([configuracion_id, codigo])
+}
+
+enum BucketRecuperabilidad {
+  CALIENTE
+  TIBIO
+  FRIO
+  PERDIDO
+}
+
+enum DireccionImpacto {
+  POSITIVO
+  NEGATIVO
+}
+
+enum EstatusLote {
+  PROCESANDO
+  COMPLETADO
+  COMPLETADO_CON_ERRORES
+  FALLIDO
+}
+
+enum EstatusPago {
+  PENDIENTE
+  VALIDADO
+}
+
+enum EstatusPromesa {
+  PENDIENTE
+  CUMPLIDA
+  CUMPLIDA_PARCIAL
+  INCUMPLIDA
+  CANCELADA
+}
+
+enum FuenteVariable {
+  INTERNO
+  EXTERNO
+}
+
+enum MotorScoring {
+  REGLAS
+  ML
+  HIBRIDO
+}
+
+enum TipoAccion {
+  ASIGNAR_AGENTE
+  ENVIAR_NOTIFICACION
+  CAMBIAR_ESTATUS
+  AGREGAR_A_COLA
+  ESCALAR_JUDICIAL
+}
+
+enum TipoAgente {
+  TELEFONICO
+  VISITADOR
+}
+
+enum TipoCondicion {
+  SCORE_MENOR_QUE
+  SCORE_MAYOR_QUE
+  DIAS_SIN_GESTION
+  DIAS_ATRASO
+  BUCKET_IGUAL
+  SALDO_MAYOR_QUE
+}
+
+enum TipoGestion {
+  TELEFONICA
+  VISITA
+}
+
+enum TipoLoteMasivo {
+  TELEFONICO
+  VISITA
+}
+
+enum TipoNormalizacion {
+  LINEAL
+  LOGARITMICA
+  BINARIA
+  CUANTILES
+}
