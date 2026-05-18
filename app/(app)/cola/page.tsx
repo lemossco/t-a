@@ -3,6 +3,24 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { safeDecrypt, formatMXN } from "@/lib/format";
+import type { Prisma } from "@prisma/client";
+
+type ColaItem = Prisma.cola_trabajoGetPayload<{
+  include: {
+    cuentas: {
+      select: {
+        id: true;
+        folio: true;
+        nombre_cliente: true;
+        saldo_vencido: true;
+        dias_atraso: true;
+        ultima_gestion: true;
+        fecha_ultima_gestion: true;
+      };
+    };
+    clientes: { select: { nombre_corto: true } };
+  };
+}>;
 import {
   Table,
   TableBody,
@@ -54,7 +72,7 @@ export default async function ColaPage() {
           clientes: { select: { nombre_corto: true } },
         },
       })
-    : [];
+    : ([] as ColaItem[]);
 
   const pendientes = cola.length;
 
@@ -105,7 +123,7 @@ export default async function ColaPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {cola.map((item: any) => (
+              {cola.map((item) => (
                 <TableRow key={item.id} className="hover:bg-muted/40">
                   <TableCell className="text-muted-foreground text-xs">
                     {item.posicion}
